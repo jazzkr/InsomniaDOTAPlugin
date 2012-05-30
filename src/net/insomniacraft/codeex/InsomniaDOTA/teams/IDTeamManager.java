@@ -40,6 +40,12 @@ public class IDTeamManager {
 		removePlayer(getTeam(p), p);
 		addPlayer(col, p);
 		p.sendMessage("You are now on team "+col.toString()+"!");
+		Location l = getSpawn(col);
+		if (l != null) {
+			p.teleport(l);
+			p.sendMessage("You have been teleported to your spawn.");
+		}
+		
 	}
 
 	public static void removeFromTeam(Player p) {

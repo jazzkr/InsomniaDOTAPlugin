@@ -33,23 +33,38 @@ public class IDGameManager {
 
 	private static int nH = 50;
 
-	public static void preStartGame(Player p) {
-		if (!(IDTeamManager.isAllReady())) {
-			p.sendMessage("Not all players are ready yet!");
-		}
+	public static void startGame(Player p) {
+		// 1. Are nexuses set?
 		if ((blueNexus == null) || redNexus == null) {
 			p.sendMessage("Blue and red nexus must be set before a game can begin.");
 			return;
 		}
+		// 2. Are turrets set?
 		if (IDTurretManager.isAllSet() == false) {
 			p.sendMessage("All turrets must be set before a game can begin.");
 			return;
 		}
-		InsomniaDOTA.broadcast(p.getName() + " wants to start a game.");
-	}
-
-	public static void startGame() {
-		gameStarted = true;
+		// 3. Are players ready?
+		if (!(IDTeamManager.isAllReady())) {
+			p.sendMessage("Not all players are ready yet!");
+			InsomniaDOTA.broadcast(p.getName() + " wants to start a game, ready up!");
+			return;
+		}
+		//Start game!
+		InsomniaDOTA.s.getScheduler().scheduleSyncDelayedTask(null, new Runnable() {
+			public void run() {
+				InsomniaDOTA.s.broadcastMessage("Game is starting in 10 seconds!");
+				for (int i = 9; i >= 0; i--) {
+					try {
+						Thread.sleep(1000);
+					}
+					catch (InterruptedException e) {}
+					InsomniaDOTA.s.broadcastMessage("Game is starting in "+i+" seconds!");
+				}
+				IDGameManager.gameStarted = true;
+			}
+		}
+		, 1L);
 	}
 
 	public static void endGame() {

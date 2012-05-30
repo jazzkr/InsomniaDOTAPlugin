@@ -56,9 +56,7 @@ public class IDListener implements Listener {
 	@EventHandler
 	public void onPlayerSpawn(PlayerRespawnEvent e) {
 		final Player p = e.getPlayer();
-
-		Bukkit.getServer().getScheduler()
-		.scheduleSyncDelayedTask(pl, new Runnable() {
+		Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
 			public void run() {
 				p.giveExp(4624);
 			}
@@ -66,13 +64,21 @@ public class IDListener implements Listener {
 
 		Colour col = IDTeamManager.getTeam(p);
 		Location l = IDTeamManager.getSpawn(col);
+		//If there is a team spawn teleport them there on death else to default spawn
 		if (l != null){
 			p.teleport(l);
+		} else {
+			p.teleport(pl.getServer().getWorld("dota").getSpawnLocation());
 		}
 	}
 
 	@EventHandler
 	public void onPlayerMove(PlayerMoveEvent e) {
+		//If game is not started you cannot move unless admin
+		if (!IDGameManager.gameStarted && !(e.getPlayer().hasPermission("DOTA.admin"))) {
+			e.setCancelled(true);
+		}
+		
 		Location pL = e.getPlayer().getLocation();
 		IDTurret turretNear = IDTurretManager.getTurretNear(pL);
 		if (turretNear == null) {

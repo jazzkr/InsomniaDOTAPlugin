@@ -2,8 +2,10 @@ package net.insomniacraft.codeex.InsomniaDOTA.structures.turrets;
 
 import java.util.ArrayList;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 
 import net.insomniacraft.codeex.InsomniaDOTA.structures.IDStructure;
 import net.insomniacraft.codeex.InsomniaDOTA.teams.IDTeam.Colour;
@@ -16,6 +18,8 @@ public class IDTurret extends IDStructure {
 	private boolean isDead;
 	private Turret id;
 	private Colour c;
+	
+	private Material tMat = Material.DIAMOND;
 
 	//Regular constructor
 	public IDTurret(ArrayList<Block> blocks, int health, Turret id, Colour col) {
@@ -61,13 +65,16 @@ public class IDTurret extends IDStructure {
 			Location l = turretBlock.getLocation();
 			World world = turretBlock.getWorld();
 			turretBlock.breakNaturally();
-			world.createExplosion(l, 12.0F);
+			world.createExplosion(l, 10.0F);
 		}
 	}
 	
 	public void reset() {
 		isDead = false;
 		setHealth(IDTurretManager.getDefaultHealth());
+		BlockState bs = turretBlock.getState();
+		bs.setType(tMat);
+		bs.update();
 	}
 	
 	public static Turret getIdFromStr(String s) {
