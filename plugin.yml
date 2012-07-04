@@ -38,6 +38,24 @@ commands:
   fb:
    description: Used to spawn a fireball
    usage: Usage is /fb
+  setturretblock:
+   description: Used to set all turret blocks to specified type id.
+   usage: Usage is /setturretblock [typeid]
+  start:
+   description: Used to attempt to start a game.
+   usage: Usage is /start
+  spawnzombie:
+   description: Used to attempt to start a game.
+   usage: Usage is /start
+  moveto:
+   description: Used to attempt to start a game.
+   usage: Usage is /start
+  spawnwave:
+   description: Used to spawn a wave at a tower for testing purposes.
+   usage: Usage is /spawnwave [colour] [structure]
+  setlevel:
+   description: Used to modify exp bar/
+   usage: Usage is /setlevel [0-1]
 permissions:
   DOTA.play:
    description: Enables a person to join and play DOTA games.

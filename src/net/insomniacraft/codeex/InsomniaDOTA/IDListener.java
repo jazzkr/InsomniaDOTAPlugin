@@ -1,5 +1,6 @@
 package net.insomniacraft.codeex.InsomniaDOTA;
 
+import java.util.List;
 import java.util.Random;
 
 import net.insomniacraft.codeex.InsomniaDOTA.chat.IDChatManager;
@@ -21,11 +22,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.event.player.PlayerChatEvent;
@@ -50,41 +55,73 @@ public class IDListener implements Listener {
 
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		Player p = e.getPlayer();
 		IDTeamManager.setTeam(Colour.NEUTRAL, p);
 	}
+	
 	@EventHandler
 	public void onPlayerSpawn(PlayerRespawnEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		final Player p = e.getPlayer();
 		Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
 			public void run() {
-				p.giveExp(4624);
+				p.setTotalExperience(4624);
 			}
 		}, 20L);
-
 		Colour col = IDTeamManager.getTeam(p);
 		Location l = IDTeamManager.getSpawn(col);
 		//If there is a team spawn teleport them there on death else to default spawn
 		if (l != null){
-			p.teleport(l);
-		} else {
-			p.teleport(pl.getServer().getWorld("dota").getSpawnLocation());
+			e.setRespawnLocation(l);
+		}
+		//Add block hat on spawn
+		if (col.equals(Colour.RED)) {
+			p.getInventory().setHelmet(new ItemStack(Material.WOOL, 1, (short)0, (Byte)Byte.valueOf("14")));
+		} else if (col.equals(Colour.BLUE)) {
+			p.getInventory().setHelmet(new ItemStack(Material.WOOL, 1, (short)0, (Byte)Byte.valueOf("11")));
 		}
 	}
 
 	@EventHandler
 	public void onPlayerMove(PlayerMoveEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
+		
+		//Interrupt recall on player move
+		Player p = e.getPlayer();
+		//If player is recalling and has actually moved physically (disregards camera movement)
+		if (IDTeamManager.isRecalling(p) && (e.getFrom().getX() != e.getTo().getX() || e.getFrom().getY() != e.getTo().getY() || e.getFrom().getZ() != e.getTo().getZ())) {
+			IDTeamManager.setRecalling(p, false);
+		}
+		
 		//If game is not started you cannot move unless admin
 		if (!IDGameManager.gameStarted && !(e.getPlayer().hasPermission("DOTA.admin"))) {
-			e.setCancelled(true);
+			Location from = e.getFrom();
+			Location spawn = IDTeamManager.getSpawn(IDTeamManager.getTeam(e.getPlayer()));
+			if (spawn != null) {
+				double dist = e.getTo().distance(spawn);
+				if (dist > 8 && dist < 12) {
+					e.setTo(from);
+				}
+				else if (dist >= 12) {
+					e.setTo(spawn);
+				}
+			}
 		}
 		
 		Location pL = e.getPlayer().getLocation();
-		IDTurret turretNear = IDTurretManager.getTurretNear(pL);
+		IDTurret turretNear = IDTurretManager.getTurretNearLoc(pL);
+		//If there are no turrets near don't bother
 		if (turretNear == null) {
 			return;
 		}
-		Player p = e.getPlayer();
+		
 		// 1. Don't poison neutral players
 		if (IDTeamManager.getTeam(p).toString().equals("NEUTRAL")) {
 			return;
@@ -93,11 +130,15 @@ public class IDListener implements Listener {
 		if (turretNear.getTeam().toString().equals(IDTeamManager.getTeam(p).toString())) {
 			return;
 		}
-		// 3. Don't stack poison
+		// 3. Don't poison if turret is dead
+		if (turretNear.isDead()) {
+			return;
+		}
+		// 4. Don't stack poison
 		if (p.hasPotionEffect(PotionEffectType.POISON)) {
 			return;
 		}
-		// 4. Don't poison if less than 2/3rds hp
+		// 5. Don't poison if less than 2/3rds hp
 		if (p.getHealth() <= 8) {
 			return;
 		}
@@ -108,6 +149,10 @@ public class IDListener implements Listener {
 
 	@EventHandler
 	public void onPlayerHit (EntityDamageByEntityEvent evt){
+		if (!evt.getEntity().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
+
 		//If both involved are not players then we are not interested
 		if (!(evt.getDamager() instanceof Player) || !(evt.getEntity() instanceof Player)){
 			return;
@@ -139,18 +184,38 @@ public class IDListener implements Listener {
 			damager.sendMessage("[DEBUG] You have hit an enemy!");
 		}
 	}
+	
+	@EventHandler
+	public void onPlayerDamage(EntityDamageEvent e) {
+		//Recall is interrupted upon damage
+		if (e.getEntity() instanceof Player) {
+			Player p = (Player) e.getEntity();
+			if (IDTeamManager.isRecalling(p)) {
+				IDTeamManager.setRecalling(p, false);
+			}
+		}
+	}
 
 	@EventHandler
 	public void onPlayerQuit(PlayerQuitEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		Player p = e.getPlayer();
 		if (p.getName().equalsIgnoreCase(IDCommands.setupPlayer)) {
 			pl.getServer().dispatchCommand(pl.getServer().getConsoleSender(), "setup");
 		}
 		IDTeamManager.removeFromTeam(p);
+		if (IDTeamManager.isRecalling(p)) {
+			IDTeamManager.setRecalling(p, false);
+		}
 	}
 
 	@EventHandler
 	public void onBlockSelect(PlayerInteractEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		if (!IDCommands.setup) {
 			return;
 		}
@@ -179,6 +244,9 @@ public class IDListener implements Listener {
 
 	@EventHandler
 	public void onPlayerChat(PlayerChatEvent e) {
+		if (!e.getPlayer().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		Player p = e.getPlayer();
 		String m = e.getMessage();
 		Colour col = IDTeamManager.getTeam(p);
@@ -204,6 +272,9 @@ public class IDListener implements Listener {
 
 	@EventHandler
 	public void onArrowHit(ProjectileHitEvent e) {
+		if (!e.getEntity().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
 		Entity projectile = e.getEntity();
 		//Check if not arrow
 		if (!(projectile instanceof Arrow)) {
@@ -253,27 +324,55 @@ public class IDListener implements Listener {
 	}
 	
 	@EventHandler
-	public void NoExperience(EntityDeathEvent e){
-		World w = e.getEntity().getWorld();
-		if (w.getName().equals("dota")){
-				e.setDroppedExp(0);
+	public void onPlayerDeath(PlayerDeathEvent e) {
+		e.setNewTotalExp(4642);
+		//Don't drop anything on death
+		List<ItemStack> drops = e.getDrops();
+		drops.clear();
+	}
+	
+	@EventHandler
+	public void onExplosion(EntityExplodeEvent e) {
+		if (!e.getLocation().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
 		}
+		//No blocks drop
+		e.setYield(0);
+	}
+	
+	@EventHandler
+	public void NoExperience(EntityDeathEvent e){
+		if (!e.getEntity().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
+		e.setDroppedExp(0);
 	}
 	
 	@EventHandler
 	public void NoHunger(FoodLevelChangeEvent e){
-		World w = e.getEntity().getWorld();
-		if (w.getName().equals("dota")){
+		if (!e.getEntity().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
+		e.setCancelled(true);
+	}
+	
+	@EventHandler
+	public void NoMobSpawn(CreatureSpawnEvent e){
+		if (!e.getEntity().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
+		}
+		if ((e.getSpawnReason().equals(SpawnReason.NATURAL)) || (e.getSpawnReason().equals(SpawnReason.DEFAULT))){
 			e.setCancelled(true);
 		}
 	}
+	
 	@EventHandler
-	public void NoMobSpawn(CreatureSpawnEvent e){
-		World w = e.getEntity().getWorld();
-		if (w.getName().equals("dota")){
-			if ((e.getSpawnReason().equals(SpawnReason.NATURAL)) || (e.getSpawnReason().equals(SpawnReason.DEFAULT))){
-				e.setCancelled(true);
-			}
+	public void NoBlockDrop(BlockBreakEvent e) {
+		if (!e.getBlock().getWorld().getName().equals(InsomniaDOTA.strWorld)){
+			return;
 		}
+		e.setCancelled(true);
+		Block b = e.getBlock();
+		b.setType(Material.AIR);
 	}
 }

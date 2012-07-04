@@ -2,10 +2,7 @@ package net.insomniacraft.codeex.InsomniaDOTA.structures.nexus;
 
 import java.util.ArrayList;
 
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.entity.TNTPrimed;
 
 import net.insomniacraft.codeex.InsomniaDOTA.IDGameManager;
 import net.insomniacraft.codeex.InsomniaDOTA.InsomniaDOTA;
@@ -24,14 +21,18 @@ public class IDNexus extends IDStructure {
 	}
 
 	public void doDamage() {
-		super.doDamage();
-		if (health <= 0) {
+		if (health > 0) {
+			super.doDamage();
+		}
+		if (health == 0) {
 			isDestroyed = true;
-			for (Block b : coreBlocks) {
-				Location l = b.getLocation();
-				World world = b.getWorld();
-				b.breakNaturally();
-				world.spawn(l, TNTPrimed.class);
+			ArrayList<Block> wool = IDGameManager.searchForBlock(coreBlocks.get(0).getLocation(), 35, 20);
+			for (Block b: coreBlocks) {
+				b.getWorld().createExplosion(b.getLocation(), 0.0F);
+			}
+			for (Block b: wool) {
+				b.setTypeIdAndData(35, Byte.valueOf("15"), true);
+				b.getWorld().createExplosion(b.getLocation(), 0.0F);
 			}
 			Colour winner = Colour.NEUTRAL;
 			if (col.toString().equals("BLUE")) {
@@ -41,8 +42,28 @@ public class IDNexus extends IDStructure {
 				winner = Colour.BLUE;
 			}
 			InsomniaDOTA.broadcast("Team "+winner.toString()+" has won the game!");
-			System.out.println("Ending game...");
-			IDGameManager.endGame();
+			InsomniaDOTA.broadcast("The game is ending in 60 seconds!");
+			InsomniaDOTA.s.getScheduler().scheduleAsyncDelayedTask(InsomniaDOTA.pl, new Runnable() {
+				public void run() {
+					for (int i = 60; i >= 0; i--) {
+						if (i == 30) {
+							InsomniaDOTA.broadcast("The game is ending in 30 seconds!");
+						}
+						if (i == 10) {
+							InsomniaDOTA.broadcast("The game is ending in 10 seconds!");
+						}
+						if (i == 1) {
+							InsomniaDOTA.broadcast("The game is now ending...");
+						}
+						try {
+							Thread.sleep(1000);
+						}
+						catch (InterruptedException e) {}
+					}
+					IDGameManager.endGame();
+				}
+			}
+			, 1L);
 		}
 	}
 
@@ -58,5 +79,4 @@ public class IDNexus extends IDStructure {
 		isDestroyed = false;
 		setHealth(IDGameManager.getNexusDefHealth());
 	}
-
 }

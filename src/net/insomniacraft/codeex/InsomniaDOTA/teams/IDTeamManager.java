@@ -29,6 +29,8 @@ public class IDTeamManager {
 
 	private static File redFile = new File(InsomniaDOTA.pFolder, "redTeam.txt");
 	private static File blueFile = new File(InsomniaDOTA.pFolder, "blueTeam.txt");
+	
+	private static ArrayList<Player> isRecalling = new ArrayList<Player>();
 
 	static {
 		red = new IDTeam(Colour.RED);
@@ -158,7 +160,7 @@ public class IDTeamManager {
 		} else if (col.toString().equals("BLUE")){
 			return blue.getSpawn();
 		}
-		return null;
+		return InsomniaDOTA.s.getWorld(InsomniaDOTA.strWorld).getSpawnLocation();
 	}
 	public static void save() throws IOException {
 		redFile.createNewFile();
@@ -248,19 +250,36 @@ public class IDTeamManager {
 			double x = Double.parseDouble(bSpawnSP [0]);
 			double y = Double.parseDouble(bSpawnSP [1]);
 			double z = Double.parseDouble(bSpawnSP [2]);
-			Location l = new Location (InsomniaDOTA.s.getWorld("dota"), x, y,z);
+			Location l = new Location (InsomniaDOTA.s.getWorld(InsomniaDOTA.strWorld), x, y,z);
 			blue.setSpawn(l);
+			System.out.println("[DEBUG] Blue spawn set!");
 		}
 		if (redSpawn != null) {
 			String [] rSpawnSP = redSpawn.split(";");
 			double x = Double.parseDouble(rSpawnSP [0]);
 			double y = Double.parseDouble(rSpawnSP [1]);
 			double z = Double.parseDouble(rSpawnSP [2]);
-			Location l = new Location (InsomniaDOTA.s.getWorld("dota"), x, y,z);
+			Location l = new Location (InsomniaDOTA.s.getWorld(InsomniaDOTA.strWorld), x, y,z);
 			red.setSpawn(l);
+			System.out.println("[DEBUG] Red spawn set!");
 		}
 
 		System.out.println("[DEBUG] Successfully loaded teams!");
+	}
+	
+	public static boolean isRecalling(Player p) {
+		if (isRecalling.contains(p)) {
+			return true;
+		}
+		return false;
+	}
+	
+	public static void setRecalling(Player p, boolean value) {
+		if (value) {
+			isRecalling.add(p);
+		} else {
+			isRecalling.remove(p);
+		}
 	}
 
 	private static void addPlayer(Colour col, Player p) {
@@ -271,17 +290,25 @@ public class IDTeamManager {
 		if (col.toString().equals("BLUE")) {
 			blue.addPlayer(p);
 			System.out.println("[DEBUG] Adding "+p.getName()+" to team blue!");
+			if (p.getInventory().getHelmet() != null) {
+				p.getInventory().getHelmet().setType(Material.AIR);
+			}
 			p.getInventory().setHelmet(new ItemStack(Material.WOOL, 1, (short)0, (Byte)Byte.valueOf("11")));
 		}
 		else if (col.toString().equals("RED")) {
 			red.addPlayer(p);
 			System.out.println("[DEBUG] Adding "+p.getName()+" to team red!");
+			if (p.getInventory().getHelmet() != null) {
+				p.getInventory().getHelmet().setType(Material.AIR);
+			}
 			p.getInventory().setHelmet(new ItemStack(Material.WOOL, 1, (short)0, (Byte)Byte.valueOf("14")));
 		}
 		else if (col.toString().equals("NEUTRAL")) {
 			neutral.addPlayer(p);
 			System.out.println("[DEBUG] Adding "+p.getName()+" to team neutral!");
-			p.getInventory().setHelmet(new ItemStack(Material.AIR, 1));
+			if (p.getInventory().getHelmet() != null) {
+				p.getInventory().getHelmet().setType(Material.AIR);
+			}
 		}
 		countPlayers();
 	}

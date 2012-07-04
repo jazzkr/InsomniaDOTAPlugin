@@ -9,15 +9,20 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import net.insomniacraft.codeex.InsomniaDOTA.IDCommands;
+import net.insomniacraft.codeex.InsomniaDOTA.IDGameManager;
 import net.insomniacraft.codeex.InsomniaDOTA.InsomniaDOTA;
 import net.insomniacraft.codeex.InsomniaDOTA.teams.IDTeam;
 import net.insomniacraft.codeex.InsomniaDOTA.teams.IDTeam.Colour;
 import net.insomniacraft.codeex.InsomniaDOTA.teams.IDTeamManager;
+import net.insomniacraft.codeex.InsomniaDOTA.structures.IDStructure;
+import net.insomniacraft.codeex.InsomniaDOTA.structures.nexus.IDNexus;
 import net.insomniacraft.codeex.InsomniaDOTA.structures.turrets.IDTurret.Turret;
 
 public class IDTurretManager {
@@ -248,6 +253,108 @@ public class IDTurretManager {
 			return false;
 		}
 	}
+	
+	public static Location getDestination(Entity e) {
+		IDTurret t = IDTurretManager.getTurretNearLoc(e.getLocation());
+		IDStructure target = IDTurretManager.getOpposingStructure(t.getId(), t.getTeam());
+		return null;
+	}
+	
+	public static IDStructure getOpposingStructure(Turret id, Colour col) {
+		if (col == Colour.RED) {
+			//Top lane
+			if (id == Turret.TOP_OUTER || id == Turret.TOP_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.TOP_OUTER, Colour.BLUE);
+				IDTurret inner = IDTurretManager.getTurret(Turret.TOP_INNER, Colour.BLUE);
+				if (inner.isDead()) {
+					return IDGameManager.getBlueNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			}
+			//Mid lane
+			else if (id == Turret.MID_OUTER || id == Turret.MID_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.MID_OUTER, Colour.BLUE);
+				IDTurret inner = IDTurretManager.getTurret(Turret.MID_INNER, Colour.BLUE);
+				if (inner.isDead()) {
+					return IDGameManager.getBlueNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			}
+			//Bot lane
+			else if (id == Turret.BOT_OUTER || id == Turret.BOT_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.BOT_OUTER, Colour.BLUE);
+				IDTurret inner = IDTurretManager.getTurret(Turret.BOT_INNER, Colour.BLUE);
+				if (inner.isDead()) {
+					return IDGameManager.getBlueNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			} else {
+				return null;
+			}
+		} else if (col == Colour.BLUE) {
+			//Top lane
+			if (id == Turret.TOP_OUTER || id == Turret.TOP_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.TOP_OUTER, Colour.RED);
+				IDTurret inner = IDTurretManager.getTurret(Turret.TOP_INNER, Colour.RED);
+				if (inner.isDead()) {
+					return IDGameManager.getRedNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			}
+			//Mid lane
+			else if (id == Turret.MID_OUTER || id == Turret.MID_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.TOP_OUTER, Colour.RED);
+				IDTurret inner = IDTurretManager.getTurret(Turret.TOP_INNER, Colour.RED);
+				if (inner.isDead()) {
+					return IDGameManager.getRedNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			}
+			//Bot lane
+			else if (id == Turret.BOT_OUTER || id == Turret.BOT_INNER) {
+				IDTurret outer = IDTurretManager.getTurret(Turret.TOP_OUTER, Colour.RED);
+				IDTurret inner = IDTurretManager.getTurret(Turret.TOP_INNER, Colour.RED);
+				if (inner.isDead()) {
+					return IDGameManager.getRedNexus();
+				} else if (outer.isDead()) {
+					return inner;
+				} else {
+					return outer;
+				}
+			} else {
+				return null;
+			}
+		} else {
+			return null;
+		}
+	}
+	
+	public static Location findGround(Location l) {
+		Block b = l.getWorld().getBlockAt(l);
+		if (b.getTypeId() != 0) {
+			//Return location 1 higher than the ground
+			Location aboveGround = new Location(b.getWorld(), b.getX(), (b.getY()+1), b.getZ());
+			return aboveGround;
+		} else {
+			Location next = new Location(l.getWorld(), l.getX(), (l.getY()-1), l.getZ());
+			return findGround(next);
+		}
+	}
 
 	public static void save() throws IOException {
 		turretFile.createNewFile();
@@ -365,7 +472,7 @@ public class IDTurretManager {
 		return true;
 	}
 	
-	public static IDTurret getTurretNear(Location l) {
+	public static IDTurret getTurretNearLoc(Location l) {
 		ArrayList<IDTurret> nearTurrets = new ArrayList<IDTurret>();
 		for (IDTurret t: blueTurrets) {
 			if (t == null) {
@@ -381,7 +488,7 @@ public class IDTurretManager {
 				continue;
 			}
 			Location lT = t.getTurretBlock().getLocation();
-			if (lT.distance(l) < 15) {
+			if (lT.distance(l) < 20) {
 				nearTurrets.add(t);
 			}
 		}
@@ -419,9 +526,9 @@ public class IDTurretManager {
 		if (id.toString().equals("TOP_INNER")) {
 			return Turret.TOP_OUTER;
 		}
-		//else if (id.toString().equals("MID_INNER")) {
-		//	return Turret.MID_OUTER;
-		//} 
+		else if (id.toString().equals("MID_INNER")) {
+			return Turret.MID_OUTER;
+		} 
 		else if (id.toString().equals("BOT_INNER")) {
 			return Turret.BOT_OUTER;
 		} else {

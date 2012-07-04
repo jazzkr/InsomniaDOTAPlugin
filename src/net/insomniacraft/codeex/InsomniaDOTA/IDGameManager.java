@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Player;
@@ -36,22 +38,29 @@ public class IDGameManager {
 	public static void startGame(Player p) {
 		// 1. Are nexuses set?
 		if ((blueNexus == null) || redNexus == null) {
-			p.sendMessage("Blue and red nexus must be set before a game can begin.");
+			p.sendMessage("Blue and red nexus must be set before a game can begin. (Contact a mod)");
 			return;
 		}
 		// 2. Are turrets set?
 		if (IDTurretManager.isAllSet() == false) {
-			p.sendMessage("All turrets must be set before a game can begin.");
+			p.sendMessage("All turrets must be set before a game can begin. (Contact a mod)");
 			return;
 		}
-		// 3. Are players ready?
+		// 3. Are there enough players to start?
+		if (IDTeamManager.getBlueCount() < 3 || IDTeamManager.getRedCount() < 3) {
+			p.sendMessage("There needs to be a minimum of 3 players on each team to start the game!");
+			if (!p.hasPermission("DOTA.admin")) {
+				return;
+			}
+		}
+		// 4. Are players ready?
 		if (!(IDTeamManager.isAllReady())) {
 			p.sendMessage("Not all players are ready yet!");
-			InsomniaDOTA.broadcast(p.getName() + " wants to start a game, ready up!");
+			InsomniaDOTA.broadcast(p.getName() + " wants to start a game, ready up! (Type /rdy)");
 			return;
 		}
 		//Start game!
-		InsomniaDOTA.s.getScheduler().scheduleSyncDelayedTask(null, new Runnable() {
+		InsomniaDOTA.s.getScheduler().scheduleAsyncDelayedTask(InsomniaDOTA.pl, new Runnable() {
 			public void run() {
 				InsomniaDOTA.s.broadcastMessage("Game is starting in 10 seconds!");
 				for (int i = 9; i >= 0; i--) {
@@ -61,6 +70,7 @@ public class IDGameManager {
 					catch (InterruptedException e) {}
 					InsomniaDOTA.s.broadcastMessage("Game is starting in "+i+" seconds!");
 				}
+				InsomniaDOTA.s.broadcastMessage("Game has started!!!");
 				IDGameManager.gameStarted = true;
 			}
 		}
@@ -72,7 +82,7 @@ public class IDGameManager {
 		LogBlock logblock = (LogBlock) InsomniaDOTA.s.getPluginManager().getPlugin("LogBlock");
 		if (logblock != null) {
 			QueryParams params = new QueryParams(logblock);
-			params.world = InsomniaDOTA.s.getWorld("dota");
+			params.world = InsomniaDOTA.s.getWorld(InsomniaDOTA.strWorld);
 			// Set to true on release?
 			params.silent = false;
 			try {
@@ -109,6 +119,15 @@ public class IDGameManager {
 			blueNexus.reset();
 			System.out.println("[DEBUG] " + blueNexus.getColour() + " nexus is reset.");
 		}
+		//Reset all player spawns
+		for (Player p: InsomniaDOTA.s.getOnlinePlayers()) {
+			Location l = IDTeamManager.getSpawn(IDTeamManager.getTeam(p));
+			if (l != null) {
+				p.teleport(l);
+			}
+		}
+		//Reset all wool blocks
+		resetWoolBlocks();
 		gameStarted = false;
 	}
 
@@ -168,7 +187,7 @@ public class IDGameManager {
 			Block[] blocks = new Block[coords.length];
 			for (int i = 0; i < coords.length; i++) {
 				String[] nums = coords[i].split(";");
-				Block b = InsomniaDOTA.s.getWorld("dota").getBlockAt(Integer.parseInt(nums[0]), Integer.parseInt(nums[1]), Integer.parseInt(nums[2]));
+				Block b = InsomniaDOTA.s.getWorld(InsomniaDOTA.strWorld).getBlockAt(Integer.parseInt(nums[0]), Integer.parseInt(nums[1]), Integer.parseInt(nums[2]));
 				blocks[i] = b;
 			}
 			setNexus(blocks, IDTeam.getColourFromStr(split[0]), Integer.parseInt(split[1]));
@@ -199,6 +218,14 @@ public class IDGameManager {
 			}
 		}
 		return all;
+	}
+	
+	public static ArrayList<Block> getBlueNexusBlocks() {
+		return blueNexus.getBlocks();
+	}
+	
+	public static ArrayList<Block> getRedNexusBlocks() {
+		return redNexus.getBlocks();
 	}
 
 	public static IDNexus getNexus(Block b) {
@@ -260,6 +287,87 @@ public class IDGameManager {
 		//If it passes all until now, then player can damage nexus
 		InsomniaDOTA.s.broadcastMessage(nCol.toString()+" nexus has been hit!");
 		return true;
+	}
+	
+	public static void setTurretBlock(int m) {
+		for (IDTurret t: IDTurretManager.getBlueTurrets()) {
+			Block b = t.getTurretBlock();
+			while (b.getTypeId() != m) {
+				b.setTypeId(m);
+			}
+			System.out.println(t.getTeam()+ " "+t.getId()+" set to "+m);
+		}
+		for (IDTurret t: IDTurretManager.getRedTurrets()) {
+			Block b = t.getTurretBlock();
+			while (b.getTypeId() != m) {
+				b.setTypeId(m);
+			}
+			System.out.println(t.getTeam()+ " "+t.getId()+" set to "+m);
+		}
+	}
+	
+	public static ArrayList<Block> searchForBlock(Location l, int typeId, int radius) {
+		ArrayList<Block> blocks = new ArrayList<Block>();
+		World w = l.getWorld();
+		int x = l.getBlockX();
+		int y = l.getBlockY();
+		int z = l.getBlockZ();
+		int maxHeight = y + radius;
+		int minHeight = y - radius;
+		int maxX = x + radius;
+		int minX = x - radius;
+		int maxZ = z + radius;
+		int minZ = z - radius;
+		//Height going down from top
+		for (int ly = maxHeight; ly >= minHeight; ly--) {
+			//Horizontal x axis
+			for (int lx = maxX; lx >= minX; lx--) {
+				//Horizontal y axis
+				for (int lz = maxZ; lz >= minZ; lz--) {
+					Block b = w.getBlockAt(lx, ly, lz);
+					if(b.getTypeId() == typeId) {
+						blocks.add(b);
+					}
+				}
+			}
+		}
+		
+		return blocks;
+	}
+	
+	public static IDNexus getRedNexus() {
+		return redNexus;
+	}
+	
+	public static IDNexus getBlueNexus() {
+		return blueNexus;
+	}
+	
+	private static void resetWoolBlocks() {
+		for (IDTurret t: IDTurretManager.getBlueTurrets()) {
+			ArrayList<Block> wool = searchForBlock(t.getTurretBlock().getLocation(), 35, 10);
+			for (Block b: wool) {
+				b.setTypeIdAndData(35, Byte.valueOf("11"), true);
+			}
+		}
+		for (IDTurret t: IDTurretManager.getRedTurrets()) {
+			ArrayList<Block> wool = searchForBlock(t.getTurretBlock().getLocation(), 35, 10);
+			for (Block b: wool) {
+				b.setTypeIdAndData(35, Byte.valueOf("14"), true);
+			}
+		}
+		for (Block nB: getBlueNexusBlocks()) {
+			ArrayList<Block> wool = searchForBlock(nB.getLocation(), 35, 20);
+			for (Block b: wool) {
+				b.setTypeIdAndData(35, Byte.valueOf("11"), true);
+			}
+		}
+		for (Block nB: getRedNexusBlocks()) {
+			ArrayList<Block> wool = searchForBlock(nB.getLocation(), 35, 20);
+			for (Block b: wool) {
+				b.setTypeIdAndData(35, Byte.valueOf("14"), true);
+			}
+		}
 	}
 	
 	private static boolean canDamageNexus(Colour col) {
